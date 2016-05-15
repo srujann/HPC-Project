@@ -2,13 +2,14 @@
 #include <stdio.h>
 #include <iostream>
 #include "gputimer.h"
+//#include "utils.h"
 
 #define N 4096
 #define MAX_THREADS 1024
 using namespace std;
 GpuTimer timer;
 
-__global__ void computeMinEnergy(float *energy, float *min_energy, int height, int width, int tempSize) {
+__global__ void computeMinEnergy(float *energy, float *min_energy, int height, int width) {
     const int bid = blockIdx.x;
     const int tid = threadIdx.x;
     const int pos = bid * blockDim.x + tid;
@@ -25,7 +26,7 @@ __global__ void computeMinEnergy(float *energy, float *min_energy, int height, i
     }
     __syncthreads();
     
-    float *temp = (float*) malloc(tempSize * sizeof(float));
+    float temp[4];
     for(int i=1; i<height; i++) {
         int k = 0;
         for(int j=tid; j<width; j += blockDim.x) {
@@ -64,7 +65,6 @@ int main(int argc, char** argv)
     int noOfBlocks = 1; 
     int noOfThreads = min(MAX_THREADS, width);
     int sharedSize = ((N-1) / noOfThreads + 1) * noOfThreads * sizeof(float);
-    int tempSize = ((N-1) / noOfThreads + 1);
     cout<<"Blocks: "<<noOfBlocks<<"  Threads: "<<noOfThreads<<" SharedSize: "<<sharedSize<<endl;
     dim3 grid(noOfBlocks), block(noOfThreads);
     float *d_energy, *d_min_energy;
@@ -84,7 +84,7 @@ int main(int argc, char** argv)
     }
     
     timer.Start();
-    computeMinEnergy<<<grid, block, sharedSize>>>(d_energy, d_min_energy, height, width, tempSize);
+    computeMinEnergy<<<grid, block, sharedSize>>>(d_energy, d_min_energy, height, width);
     timer.Stop();
     
     rc = cudaMemcpy(h_energy1, d_min_energy, N * N * sizeof(float), cudaMemcpyDeviceToHost);
