@@ -45,16 +45,6 @@ __global__ void computeMinEnergyMatrix(float *energy, float *min_energy, int hei
     }
 }
 
-unsigned int nextPow2( unsigned int x ) {
-  --x;
-  x |= x >> 1;
-  x |= x >> 2;
-  x |= x >> 4;
-  x |= x >> 8;
-  x |= x >> 16;
-  return ++x;
-}
-
 int main(int argc, char** argv)
 {
     int height = N;
@@ -75,7 +65,7 @@ int main(int argc, char** argv)
 
     int noOfBlocks = 1; 
     int noOfThreads = min(MAX_THREADS, width);
-    int sharedSize = ((N-1) / noOfThreads + 1) * noOfThreads * sizeof(float);
+    int sharedSize = ((width-1) / noOfThreads + 1) * noOfThreads * sizeof(float);
     
     cout<<"Blocks: "<<noOfBlocks<<"  Threads: "<<noOfThreads<<" SharedSize: "<<sharedSize<<endl;
     
