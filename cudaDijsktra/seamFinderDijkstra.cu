@@ -3,8 +3,8 @@
 #include <iostream>
 #include "gputimer.h"
 
-#define N 6
-#define imgHeight 6
+#define N 200
+#define imgHeight 200
 #define MAX_THREADS 1024
 #define fMax 999999
 using namespace std;
@@ -12,7 +12,7 @@ GpuTimer timer;
 
 struct minPixel{
 	float energy;
-	int column;
+	int y;
 };
 
 __global__ void computeMinEnergyMatrix(float *energy, float *min_energy,int height,int width) {
@@ -24,23 +24,24 @@ __global__ void computeMinEnergyMatrix(float *energy, float *min_energy,int heig
     __shared__ int shared_minX;
     __shared__ int shared_minY;
     __shared__ int shared_minEnergy;
+    __shared__ float shared_energy[N*N];
     
-    float columnEnergy[imgHeight];
-    float minPathEnergy[imgHeight];
+    //float columnEnergy[imgHeight];
+    //float minPathEnergy[imgHeight];
     bool activeNodes[imgHeight];
-    int minCol = 0;
+    int minY = 0;
     int minEnergy = fMax;
     
     for(int i = 0; i < height; i++) {
-    	columnEnergy[i] = energy[width*i + pos];
-    	minPathEnergy[i] = fMax;
+    	shared_energy[width*i + pos] = energy[width*i + pos];
+    	min_energy[width*i+pos] = fMax;
     	activeNodes[i] = false;
     }
     
-    minPathEnergy[0] = columnEnergy[0];
+    min_energy[pos] = energy[pos];
     activeNodes[0] = true;
-    shared_minSet[pos].energy = columnEnergy[0];
-    shared_minSet[pos].column = 0;
+    shared_minSet[pos].energy = energy[pos];
+    shared_minSet[pos].y = 0;
     __syncthreads();
     
     for(int i = 0; i < (height*width)-1; i++) {
@@ -54,7 +55,7 @@ __global__ void computeMinEnergyMatrix(float *energy, float *min_energy,int heig
     			}
     		}
     		shared_minX = tMinX;
-    		shared_minY = shared_minSet[tMinX].column; 	
+    		shared_minY = shared_minSet[tMinX].y; 	
     		shared_minEnergy = tMinEnergy;
     		//printf("minX:%d, minY:%d \n", shared_minX, shared_minY);
     	}
@@ -65,31 +66,31 @@ __global__ void computeMinEnergyMatrix(float *energy, float *min_energy,int heig
     	 }
     	 
     	 if(shared_minX == pos) {
-    	    activeNodes[minCol] = false;
+    	    activeNodes[shared_minY] = false;
     	 }
     	 
     	 if(pos == shared_minX-1 || pos == shared_minX || pos == shared_minX+1) {
-    	 	if(minPathEnergy[shared_minY+1] > shared_minEnergy+columnEnergy[shared_minY+1]) {
-    	 		minPathEnergy[shared_minY+1] = shared_minEnergy+columnEnergy[shared_minY+1];
+    	 	if(min_energy[width*(shared_minY+1)+pos] > shared_minEnergy+shared_energy[(shared_minY+1)*width+pos]) {
+    	 		min_energy[width*(shared_minY+1)+pos] = shared_minEnergy+shared_energy[(shared_minY+1)*width+pos];
     	 		activeNodes[shared_minY+1] = true;
     	 	}
     	 }
     	 
     	 minEnergy = fMax;
     	 for(int j = 0; j < height; j++) {
-    	    if(activeNodes[j] && minPathEnergy[j] < minEnergy) {
-    	 		minCol = j;
-    	 		minEnergy = minPathEnergy[j];
+    	    if(activeNodes[j] && min_energy[width*j+pos] < minEnergy) {
+    	 		minY = j;
+    	 		minEnergy = min_energy[width*j+pos];
     	 	}
     	 }
     	 shared_minSet[pos].energy = minEnergy;
-    	 shared_minSet[pos].column = minCol;
+    	 shared_minSet[pos].y = minY;
     	 __syncthreads();
     }
     
-    for(int i = 0; i < height; i++) {
+    /*for(int i = 0; i < height; i++) {
     	min_energy[width*i+pos] = minPathEnergy[i];
-    }
+    }*/
     __syncthreads();
 }
 
@@ -103,7 +104,7 @@ int main(int argc, char** argv)
     cout<<"Original Matrix"<<endl;
     for(int i= 0; i<height; i++) {
         for(int j=0; j<width; j++) {
-            h_energy[i * N + j] = (i * N + j) > width/2 ? ((i * N + j) * 23)%17 : ((i * N + j) * 23)%17 + 2;
+            h_energy[i * N + j] = (i * N + j) > width/2 ? (i * N +j)%23 : (j * N + i)%23;
             //cout << h_energy[i * N + j] << "  ";
         }
         //cout<<endl;
@@ -160,7 +161,7 @@ int main(int argc, char** argv)
     
     timer.Start();
     float mn = h_min_energy[0];
-    for(int i=1; i<width; i++) {
+    for(int i=height-1; i<width; i++) {
         if(h_min_energy[i] < mn) {
             mn = h_min_energy[i];
         }
