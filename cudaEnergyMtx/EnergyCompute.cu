@@ -89,20 +89,15 @@ __global__ void energyMtxCompute(const unsigned char* imgData, int* energyMtx,
 	int currIndex = 0, row = 0;
 
 	//load first row into shared memory
-	for (int i = x; i < width; i = i + 1024) {
-		currIndex = 3 * i;
-		for (int j = 0; j < 3; j++) {
-			shared_imgData[0][3 * i + j] = imgData[currIndex + j];
-		}
+	for(int i = x; i < 3*width; i = i+1024) {
+		shared_imgData[0][i] = imgData[i];
 	}
 
 	//load the last row shared memory
-	row = (height - 1) * width * 3;
-	for (int i = x; i < width; i = i + 1024) {
-		currIndex = row + 3 * i;
-		for (int j = 0; j < 3; j++) {
-			shared_imgData[2][3 * i + j] = imgData[currIndex + j];
-		}
+	row = (height-1)*width*3;
+	for(int i = x; i < 3*width; i = i +1024) {
+		currIndex = row + i;
+		shared_imgData[2][i] = imgData[currIndex];
 	}
 
 	int hCurrent = 0, hMove = 0, hShared = 0;
@@ -116,11 +111,9 @@ __global__ void energyMtxCompute(const unsigned char* imgData, int* energyMtx,
 
 		//move next row into shared memory
 		row = hMove * width * 3;
-		for (int i = x; i < width; i = i + 1024) {
-			currIndex = row + 3 * i;
-			for (int j = 0; j < 3; j++) {
-				shared_imgData[hShared][3 * i + j] = imgData[currIndex + j];
-			}
+		for(int i = x; i < 3*width; i = i+1024) {
+			currIndex = row + i; 
+			shared_imgData[hShared][i] = imgData[currIndex];
 		}
 		__syncthreads();
 
