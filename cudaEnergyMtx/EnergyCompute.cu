@@ -81,6 +81,9 @@ __global__ void energyMtxCompute(const unsigned char* imgData, int* energyMtx, c
 		blockWidth = width - (blockIdx.x * blockDim.x);
 	}
 
+	if(tid >= blockWidth)
+    	return;
+
 	int boundX = (y * width) * 3 + blockDim.x * blockIdx.x * 3;
 	for (int j = tid; j < 3 * blockWidth; j = j + blockWidth) {
 		curr_imgData[j] = imgData[boundX + j];
@@ -212,11 +215,11 @@ int main(int argc, char** argv) {
 		gridRows = width / numThreads + 1;
 	}
 
-	dim3 gridDim(gridRows, gridCols, 1);
-	dim3 blockDim(numThreads, 1, 1);
+	dim3 grid_Dim(gridRows, gridCols, 1);
+	dim3 block_Dim(numThreads, 1, 1);
 
 	timer.Start();
-	energyMtxCompute<<<gridDim, blockDim, sharedSize>>>(d_imgData, d_energyMtx, height, width);
+	energyMtxCompute<<<grid_Dim, block_Dim, sharedSize>>>(d_imgData, d_energyMtx, height, width);
 	timer.Stop();
 
 	rc = cudaMemcpy(h_energyMtx, d_energyMtx, energyMtxSize * sizeof(int), cudaMemcpyDeviceToHost);
