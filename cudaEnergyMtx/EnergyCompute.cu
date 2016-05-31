@@ -8,9 +8,9 @@
 using namespace std;
 GpuTimer timer;
 
-void energyCalculation(int* energy, unsigned char* data, int size, int height, int width) {
+void energyCalculation(float* energy, unsigned char* data, int size, int height, int width) {
 	/*Energy Calculation*/
-	int sumX = 0, sumY = 0;
+	float sumX = 0, sumY = 0;
 	for (int i = 0; i < size / 3; i++) {
 		sumX = 0;
 		sumY = 0;
@@ -53,7 +53,7 @@ void sequentialEnergyCompute() {
 	fread(data, sizeof(unsigned char), size, documentRead);
 	fclose(documentRead);
 
-	int* energy = new int[size / 3];
+	float* energy = new float[size / 3];
 	timer.Start();
 	energyCalculation(energy, data, size, height, width);
 	timer.Stop();
@@ -63,11 +63,11 @@ void sequentialEnergyCompute() {
 	FILE* docWrite = fopen("testEnergyMatrix", "wb");
 	fwrite(&height, sizeof(int), 1, docWrite);
 	fwrite(&width, sizeof(int), 1, docWrite);
-	fwrite(energy, sizeof(int), size / 3, docWrite);
+	fwrite(energy, sizeof(float), size / 3, docWrite);
 	fclose(docWrite);
 }
 
-__global__ void energyMtxCompute(const unsigned char* imgData, int* energyMtx, const int height, const int width) {
+__global__ void energyMtxCompute(const unsigned char* imgData, float* energyMtx, const int height, const int width) {
 
 	extern __shared__ unsigned char curr_imgData[];
 
@@ -127,7 +127,7 @@ __global__ void energyMtxCompute(const unsigned char* imgData, int* energyMtx, c
 	up = (y == 0) ? (((height - 1) * width + x) * 3) : (((y - 1) * width + x) * 3);
 	down = (((y + 1) % height) * width + x) * 3;
 
-	int energyVal = 0, dx = 0, dy = 0;
+	float energyVal = 0, dx = 0, dy = 0;
 	//compute the energy value for the pixel
 	for (int i = 0; i < 3; i++) {
 		dx = curr_imgData[right + i] - curr_imgData[left + i];
@@ -142,7 +142,7 @@ __global__ void energyMtxCompute(const unsigned char* imgData, int* energyMtx, c
 int main(int argc, char** argv) {
 	sequentialEnergyCompute();
 	int height = 0, width = 0, energyMtxSize = 0;
-	int *testEnergy;
+	float *testEnergy;
 	string inImageFileName = "TestImage3";
 	FILE* docRead = fopen("testEnergyMatrix", "rb");
 	if (!docRead) {
@@ -154,8 +154,8 @@ int main(int argc, char** argv) {
 	fread(&width, sizeof(int), 1, docRead);
 	energyMtxSize = height * width;
 
-	testEnergy = (int*) malloc(energyMtxSize * sizeof(int));
-	fread(testEnergy, sizeof(int), energyMtxSize, docRead);
+	testEnergy = (float*) malloc(energyMtxSize * sizeof(int));
+	fread(testEnergy, sizeof(float), energyMtxSize, docRead);
 	fclose(docRead);
 
 	FILE* documentRead = fopen(inImageFileName.c_str(), "rb");
@@ -176,12 +176,12 @@ int main(int argc, char** argv) {
 	fclose(documentRead);
 
 	cudaError_t rc;
-	int *d_energyMtx, *h_energyMtx;
+	float *d_energyMtx, *h_energyMtx;
 	unsigned char* d_imgData;
 
-	h_energyMtx = (int *) malloc(energyMtxSize * sizeof(int));
+	h_energyMtx = (float *) malloc(energyMtxSize * sizeof(float));
 
-	rc = cudaMalloc((void**) &d_energyMtx, energyMtxSize * sizeof(int));
+	rc = cudaMalloc((void**) &d_energyMtx, energyMtxSize * sizeof(float));
 	if (rc != cudaSuccess) {
 		cout << "Malloc Failed for d_energyMtx" << endl;
 	}
@@ -209,7 +209,7 @@ int main(int argc, char** argv) {
 	energyMtxCompute<<<grid_Dim, block_Dim, sharedSize>>>(d_imgData, d_energyMtx, height, width);
 	timer.Stop();
 
-	rc = cudaMemcpy(h_energyMtx, d_energyMtx, energyMtxSize * sizeof(int), cudaMemcpyDeviceToHost);
+	rc = cudaMemcpy(h_energyMtx, d_energyMtx, energyMtxSize * sizeof(float), cudaMemcpyDeviceToHost);
 	if (rc != cudaSuccess) {
 		cout << "Memcpy failed from device to host with rc:" << rc << endl;
 	}
@@ -217,7 +217,7 @@ int main(int argc, char** argv) {
 	cout << "Time taken for parallel energy computation to execute:" << timer.Elapsed() << endl;
 	int i = 0;
 	for (i = 0; i < height * width; i++) {
-		if (testEnergy[i] != h_energyMtx[i]) {
+		if (testEnergy[i]-h_energyMtx[i] > 0.00001) {
 			cout << "error at index i:" << i << "|expected:" << testEnergy[i] << "|actual:" << h_energyMtx[i] << endl;
 			break;
 		}
