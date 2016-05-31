@@ -75,11 +75,8 @@ __global__ void energyMtxCompute(const unsigned char* imgData, int* energyMtx, c
 	int x = blockIdx.x * blockDim.x + tid;
 	int y = blockIdx.y;
 	int currIndex = 0;
-	int blockWidth = blockDim.x;
-
-	if (width < (blockIdx.x + 1) * blockDim.x) {
-		blockWidth = width - (blockIdx.x * blockDim.x);
-	}
+	
+	int blockWidth = (width < (blockIdx.x + 1) * blockDim.x) ? (width - (blockIdx.x * blockDim.x)) : blockDim.x;
 
 	if(tid >= blockWidth)
     	return;
@@ -127,12 +124,7 @@ __global__ void energyMtxCompute(const unsigned char* imgData, int* energyMtx, c
 		left = (tid - 1) * 3;
 	}
 
-	if (y == 0) {
-		up = ((height - 1) * width + x) * 3;
-	} else {
-		up = ((y - 1) * width + x) * 3;
-	}
-
+	up = (y == 0) ? (((height - 1) * width + x) * 3) : (((y - 1) * width + x) * 3);
 	down = (((y + 1) % height) * width + x) * 3;
 
 	int energyVal = 0, dx = 0, dy = 0;
@@ -205,15 +197,10 @@ int main(int argc, char** argv) {
 	}
 
 	int numThreads = min(MAX_THREADS, width);
-	int gridRows = 1;
 	int gridCols = height;
 	int sharedSize = (numThreads + 2) * 3;
 
-	if (width % numThreads == 0) {
-		gridRows = width / numThreads;
-	} else {
-		gridRows = width / numThreads + 1;
-	}
+	int gridRows = (width % numThreads == 0) ? (width / numThreads) : (width / numThreads + 1);
 
 	dim3 grid_Dim(gridRows, gridCols, 1);
 	dim3 block_Dim(numThreads, 1, 1);
